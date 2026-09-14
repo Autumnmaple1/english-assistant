@@ -214,6 +214,7 @@ Provider checks use your saved key and can consume API quota. Their result file 
 | `dist/ScreenEnglish/` | Self-contained app folder; needs no .NET or Windows App SDK install |
 | `dist/ScreenEnglish-<version>-portable-win-x64.zip` | That folder zipped, for copying to another PC |
 | `dist/ScreenEnglish-Setup-<version>.exe` | Per-user installer with a Start menu entry, optional desktop and sign-in shortcuts, and an uninstaller |
+| `dist/SHA256SUMS.txt` | SHA-256 hashes of the installer and the portable zip, for verifying a download |
 
 ```powershell
 .\pack.ps1
@@ -223,11 +224,23 @@ The publish step is `dotnet publish -c Release -p:Platform=x64 -r win-x64 --self
 
 The installer installs for the current user into `%LOCALAPPDATA%\Programs\ScreenEnglish` without an administrator prompt, refuses Windows builds older than 10.0.19041, stops a running copy before replacing files, and removes its own files, shortcuts and `Start with Windows` entry on uninstall. Settings in `%LOCALAPPDATA%\ScreenEnglish` and API keys in Windows Credential Manager are left untouched.
 
-The installer is not code-signed, so SmartScreen may warn the first time it runs on another PC. Sign it before sharing it widely:
+The installer is not code-signed, so SmartScreen may warn the first time it runs on another PC. `signtool.exe` ships with the Windows SDK and is normally not on `PATH`; run it from `C:\Program Files (x86)\Windows Kits\10\bin\<version>\x64\`.
+
+Unsigned is fine for personal use: the per-user installer needs no administrator prompt, and SmartScreen prompts only for files that carry the mark of the web, where the recipient continues with **More info** then **Run anyway**. `dist\SHA256SUMS.txt` lists the SHA-256 of the installer and zip so a recipient can verify the download.
+
+Signing needs a code-signing certificate you own. Do not use signtool's `/a` switch: it picks the "best" certificate already in your stores, which on an ordinary Windows install can be an unrelated one (Phone Link keeps its own certificates there).
 
 ```powershell
-signtool sign /fd SHA256 /a /tr http://timestamp.digicert.com /td SHA256 dist\ScreenEnglish-Setup-1.0.0.exe
+# certificate already in your user store
+signtool sign /fd SHA256 /sha1 <thumbprint> /tr http://timestamp.digicert.com /td SHA256 dist\ScreenEnglish-Setup-1.0.0.exe
+
+# certificate file
+signtool sign /fd SHA256 /f certificate.pfx /p <password> /tr http://timestamp.digicert.com /td SHA256 dist\ScreenEnglish-Setup-1.0.0.exe
+
+# check the result
+signtool verify /pa /v dist\ScreenEnglish-Setup-1.0.0.exe
 ```
+
 
 Other ways to ship it:
 
