@@ -19,7 +19,7 @@ The learning panel uses a neutral light/dark design, compact controls, a draggab
 
 ## Requirements
 
-This repository currently produces an **unpackaged x64 development build**.
+This repository produces an **unpackaged x64 development build**; `pack.ps1` also produces a self-contained build and a per-user installer (see [Package as a Windows app](#package-as-a-windows-app)).
 
 - Windows 10 version 2004 or later, or Windows 11. The current verification machine uses Windows 11; appearance can differ on Windows 10.
 - .NET 8 SDK to build; the build is framework-dependent and requires a compatible .NET runtime to run.
@@ -205,6 +205,35 @@ Provider checks use your saved key and can consume API quota. Their result file 
 | Build cannot overwrite the EXE | Exit Screen English from the tray and rebuild |
 | Startup stops working after a move | Toggle Start with Windows off and on at the new location |
 
+## Package as a Windows app
+
+`pack.ps1` publishes a self-contained x64 build into `dist/` and packages it:
+
+| Artifact | What it is |
+|---|---|
+| `dist/ScreenEnglish/` | Self-contained app folder; needs no .NET or Windows App SDK install |
+| `dist/ScreenEnglish-<version>-portable-win-x64.zip` | That folder zipped, for copying to another PC |
+| `dist/ScreenEnglish-Setup-<version>.exe` | Per-user installer with a Start menu entry, optional desktop and sign-in shortcuts, and an uninstaller |
+
+```powershell
+.\pack.ps1
+```
+
+The publish step is `dotnet publish -c Release -p:Platform=x64 -r win-x64 --self-contained true`. The installer is compiled with [Inno Setup 6](https://jrsoftware.org/isdl.php); `pack.ps1` looks for `ISCC.exe` in `.tools/InnoSetup` and then in Program Files, and skips only the installer step when it is missing.
+
+The installer installs for the current user into `%LOCALAPPDATA%\Programs\ScreenEnglish` without an administrator prompt, refuses Windows builds older than 10.0.19041, stops a running copy before replacing files, and removes its own files, shortcuts and `Start with Windows` entry on uninstall. Settings in `%LOCALAPPDATA%\ScreenEnglish` and API keys in Windows Credential Manager are left untouched.
+
+The installer is not code-signed, so SmartScreen may warn the first time it runs on another PC. Sign it before sharing it widely:
+
+```powershell
+signtool sign /fd SHA256 /a /tr http://timestamp.digicert.com /td SHA256 dist\ScreenEnglish-Setup-1.0.0.exe
+```
+
+Other ways to ship it:
+
+- **Portable:** copy `dist\ScreenEnglish\` anywhere, or unpack the zip, and run `ScreenEnglish.exe`. Keep the whole folder together.
+- **MSIX or Microsoft Store:** would need a `Package.appxmanifest`, image assets (44/150/310/620 px logos), and a signing certificate. Packaged apps also need a `windows.startupTask` extension, because a packaged app cannot rely on writing the per-user Run entry that `Start with Windows` uses today.
+
 ## Icon and visual assets
 
 The icon is a simple ivory open book on charcoal, with a restrained sage accent. It is used by the executable, native windows, tray, and panel header.
@@ -240,6 +269,9 @@ english-assistant/
 │   ├── RuntimeLog.cs           Small privacy-conscious runtime log
 │   └── SelfTests.cs            Integration checks and diagnostic helpers
 ├── data/                       OCR model and WordNet archive
+├── pack.ps1                    Publishes the app and builds the installer
+├── installer/
+│   └── ScreenEnglish.iss       Per-user installer definition
 ├── build-icon.ps1
 ├── setup.ps1
 ├── run.ps1
