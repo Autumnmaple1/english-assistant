@@ -110,6 +110,16 @@ public static class SelfTests
             Assert(capture.Hit(-1880, 110) == 0 && capture.Hit(-1800, 110) == 1 && capture.Hit(10, 10) == -1, "Coordinate hit failure.");
             Assert(capture.Phrase(1, 0).Term == "Hello world", "Reverse selection changed reading order."); return Task.CompletedTask;
         });
+        await Check("OCR word boxes split on punctuation and keep internal apostrophes", () => {
+            const string sentence = "Hello, world! Don't stop; who? yes/no (end).";
+            var glyphs = new List<OcrService.Glyph>();
+            for (int i = 0; i < sentence.Length; i++) glyphs.Add(new OcrService.Glyph(sentence[i], 100 + i * 10, 40, 108 + i * 10, 70));
+            var split = OcrService.Segment(glyphs, sentence, 1);
+            Assert(string.Join("|", split.Select(w => w.Text)) == "Hello|world|Don't|stop|who|yes|no|end", "Punctuation was not separated: " + string.Join("|", split.Select(w => w.Text)));
+            Assert(split.All(w => w.Box[2] > w.Box[0] && w.Box[3] > w.Box[1] && w.Context == sentence), "A separated word lost its box or context.");
+            Assert(split.Zip(split.Skip(1)).All(pair => pair.First.Box[2] <= pair.Second.Box[0]), "Word boxes are not in reading order.");
+            return Task.CompletedTask;
+        });
         byte[] fixture;
         using (var bitmap = new Bitmap(1000, 150)) {
             using (var graphics = Graphics.FromImage(bitmap)) { graphics.Clear(Color.White); using var font = new Font("Arial", 30, FontStyle.Regular, GraphicsUnit.Pixel); graphics.DrawString("Learning English takes practice every day.", font, Brushes.Black, 20, 40); }
@@ -117,9 +127,9 @@ public static class SelfTests
         }
         await Check("Real local OCR returns readable text and distinct word coordinates", async () => {
             using var ocr = new OcrService(); var result = await ocr.Read(fixture);
-            Assert(result.Text == "Learning English takes practice every day.", "Fixture text not recognized: " + result.Text);
-            Assert(result.Words.Count == 6 && result.Words.All(w => w.Box[2] > w.Box[0] && w.Box[3] > w.Box[1] && w.Box[2] <= 1000), "Word boxes missing or not mapped back to source pixels.");
             File.WriteAllText(Path.Combine(output, "ocr-result.json"), JsonSerializer.Serialize(new { result.Text, result.Words }, SettingsStore.Json));
+            Assert(result.Text == "Learning English takes practice every day.", "Fixture text not recognized: " + result.Text);
+            Assert(result.Words.Count == 6 && result.Words[^1].Text == "day" && result.Words.All(w => w.Box[2] > w.Box[0] && w.Box[3] > w.Box[1] && w.Box[2] <= 1000), "Word boxes missing or not mapped back to source pixels.");
         });
         await Check("Screen lookup closes on release and ignores pending OCR completion", async () => {
             bool held = true;

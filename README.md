@@ -252,6 +252,7 @@ The implementation uses straightforward WinUI code-behind within one C# applicat
 ## Reading tips
 
 - Capture clear, horizontal English at a readable size for best OCR results.
+- Screen lookup counts letters joined by apostrophes or hyphens as one word. Punctuation such as `,` `.` `?` `:` `/` ends a word, so `day.` and `yes/no` look up `day`, `yes`, and `no`.
 - Screen lookup uses the monitor under the pointer.
 - WordNet supplies general dictionary entries; AI fallback handles missing entries using nearby text.
 - Translation joins ordinary OCR line wraps while preserving blank paragraphs and list boundaries. The panel retains the captured original text.
